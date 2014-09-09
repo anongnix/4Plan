@@ -6,7 +6,7 @@ int main() {
 	fp = fopen("test.txt", "r");
 	if (fp) {
     	while ((c = getc(fp)) != EOF)
-        putchar(c);
+        	putchar(c);
     	fclose(fp);
 	}
 }
