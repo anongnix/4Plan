@@ -1,0 +1,117 @@
+#!/bin/rc
+# terminal startup
+TIMESYNCARGS=(-rLa1000000)
+
+# bind all likely devices
+for(i in S f k t m i v L P u U A '$' Σ κ)
+	bind -a '#'^$i /dev >/dev/null >[2=1]
+rm -f /env/i
+
+mount -qb /srv/cons /dev
+
+# mount points 
+mntgen -s slashn && chmod 666 /srv/slashn
+mntgen -s slashmnt /mnt && chmod 666 /srv/slashmnt
+mntgen -s mntexport /mnt/exportfs && chmod 666 /srv/mntexport
+
+# move factotum from /mnt to /mnt/factotum
+mount /srv/factotum /mnt/temp
+unmount /srv/factotum /mnt
+bind /mnt/temp/factotum /mnt/factotum
+unmount /mnt/temp
+
+# usb listener
+nusbrc
+
+# set up any partitions
+diskparts
+
+# start up local swapping
+disk=`{ls /dev/sd*/swap >[2]/dev/null}
+if (! ~ $#disk 0)
+	swap $disk(1) >/dev/null >[2=1]
+rm -f /env/disk
+
+# cs sets sysname
+ndb/cs
+sysname=`{cat /dev/sysname}
+if(~ $#sysname 0 || ~ $sysname ''){
+	sysname=cirno			# default
+	echo -n $sysname >/dev/sysname
+}
+
+# parallelism for mk
+NPROC=`{wc -l </dev/sysstat}
+
+# machine specific startup (e.g., for devices not probed)
+if(test -e /cfg/$sysname/termrc)
+	. /cfg/$sysname/termrc
+
+# automatic ip address setup
+if(test -r /net/ipselftab){
+	if(! grep u /net/ipselftab | grep -sv 127.0.0.1){
+		ether=`{ndb/query sys $sysname ether}
+		if(~ $#ether 1){
+			# try /lib/ndb first, then do dhcp
+			ip/ipconfig -N >[2]/dev/null || ip/ipconfig
+		}
+		rm -f /env/ether
+	}
+}
+
+if(! test -e /net/dns)
+	ndb/dns -r
+
+if(! ~ $terminal *vx32*){
+	# start timesync if it isn't running and we weren't told not to
+	if(! ps|grep -s timesync)
+		if(! ~ $TIMESYNCARGS '')
+			aux/timesync $TIMESYNCARGS
+}
+
+fn ask {
+	if(~ $"$1 ask){
+		echo -n $1
+		echo -n $2
+		echo -n ' ['
+		echo -n $3
+		echo -n '] '
+		$1=`{read}
+		if(~ $"$1 '!rc'){
+			rc -i
+			$1=ask
+		}
+		if(~ $#$1 0)
+			$1=$3
+		ask $*
+	}
+}
+
+ask vgasize ' is (text, 640x480x8, 1024x768x16, ...)' 1024x768x16
+if(! ~ $"vgasize '' text none){
+	ask monitor ' is (vesa, xga, lcd, ...)' vesa
+	if(! ~ $"monitor ''){
+		if(test -f /dev/mousectl)
+			ask mouseport ' is (ps2, ps2intellimouse, 0, 1, 2)' ps2
+		if not
+			mouseport=none
+		@{
+			rfork n
+			if(~ $monitor vesa)
+				aux/realemu
+			aux/vga -l $vgasize
+		}
+		switch($mouseport){
+		case ps2 ps2intellimouse 0 1 2
+			aux/mouse $mouseport
+			if(~ $accupoint 1)
+				pipefile -dr /bin/aux/accupoint /dev/mouse
+		}
+	}
+}
+rm -f '/env/fn#ask'
+
+if(test -f /dev/apm)
+	aux/apm
+
+dontkill '^(ipconfig|factotum|mntgen|kfs|cfs|cwfs.*|9660srv|dossrv|paqfs|cs|dns|listen|reboot|usbd|kb|disk|ether)$'

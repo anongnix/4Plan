@@ -1,0 +1,49 @@
+$objtype
+	bin
+		9660srv
+		awk
+		aux
+			kbdfs
+		bind
+		cat
+		cfs
+		cryptsetup
+		dd
+		disk
+			fdisk
+			kfs
+			prep
+		dossrv
+		echo
+		cwfs64x
+		grep
+		ip
+			ipconfig
+		ls
+		mkdir
+		mntgen
+		mount
+		mv
+		rc
+		rm
+		sed
+		sleep
+		srv
+		test
+		unmount
+		nusb
+			usbd
+			disk
+			kb
+		xd
+rc
+	lib
+		rcmain
+		local.rc 555 sys sys ../boot/local.rc
+		tcp.rc 555 sys sys ../boot/tcp.rc
+	bin
+		fstype
+		diskparts
+		nusbrc 555 sys sys ../boot/nusbrc
+		bootrc 555 sys sys ../boot/bootrc
+tmp

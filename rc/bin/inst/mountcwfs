@@ -1,0 +1,142 @@
+#!/bin/rc
+
+# desc: choose and mount file system partition
+# prereq: systype
+
+service=cwfs
+
+switch($1){
+case go
+	echo
+	echo The please choose your $fstype partitions
+	echo
+
+	files=(`{ls /dev/sd*/fscache* /dev/fs/fscache* >[2]/dev/null})
+	if(! ~ $#files 0)
+		ls -l $files
+	echo
+	if(~ $#files 1)
+		default=(-d $files)
+	if not
+		default=()
+	prompt $default 'Cwfs cache partition' $files
+	fs=$rd
+	export fs
+
+	files=(`{ls /dev/sd*/fsworm* /dev/fs/fsworm* >[2]/dev/null})
+	if(! ~ $#files 0)
+		ls -l $files
+	echo
+	if(~ $#files 1)
+		default=(-d $files)
+	if not
+		default=()
+	prompt $default 'Cwfs worm partition' $files
+	fsworm=$rd
+	export fsworm
+
+	files=(`{ls /dev/sd*/other* /dev/fs/other* >[2]/dev/null})
+	if(! ~ $#files 0)
+		ls -l $files
+	echo
+	if(~ $#files 1)
+		default=(-d $files)
+	if not
+		default=()
+	prompt $default 'Cwfs other partition' $files
+	fsother=$rd
+	export fsother
+
+	ream=no
+	if(! ~ $fstype `{fstype $fs})
+		ream=yes
+	prompt -d $ream 'Ream the filesystem?' yes no
+	ream=$rd
+
+	log Starting $fstype file server for $fs
+	unmount /n/newfs >[2]/dev/null
+	echo halt >>/srv/$service.cmd >[2]/dev/null
+	rm -f /srv/$service /srv/$service.cmd
+
+	if(~ $ream yes){
+		if(! test -f /tmp/fsconfig){
+			{
+				echo service $service
+				echo config $fs
+
+				if(! ~ $syst cpu){
+					# new config option
+					echo noauth
+				}
+
+				echo filsys main c'('$fs')('$fsworm')'
+				echo filsys dump o
+				if(! ~ $fsother ''){
+					echo filsys other '('$fsother')'
+					echo ream other
+				}
+				echo ream main
+				echo end
+			} >/tmp/fsconfig
+		}
+		echo 'Reaming filesystem'
+		if(! $fstype -f $fs -C -c </tmp/fsconfig){
+			mountfs=ready
+			export mountfs
+			exit oops
+		}
+	}
+	if not {
+		echo 'Entering manual configuration mode. when done, type end'
+		if(! $fstype -n $service -f $fs -c){
+			mountfs=ready
+			export mountfs
+			exit oops
+		}
+	}
+
+	log Configuering $fstype file server for $fs
+	{
+		echo noattach
+		echo allow
+		echo users default
+		echo cfs main
+		echo create /adm adm adm 775 d
+		echo create /adm/users adm adm 664
+		echo create /dist sys sys 775 d
+		echo create /usr sys sys 775 d
+		echo newuser $user
+		echo newuser adm +$user
+		echo newuser sys +$user
+		echo newuser upas +$user
+		if(! ~ $fsother ''){
+			echo cfs other
+			echo create /usr sys sys 775 d
+			echo create /usr/$user $user $user 775 d
+			echo create /usr/$user/tmp $user $user 750 d
+			echo cfs main
+		}
+		echo noattach
+		sleep 2
+	} >>/srv/$service.cmd
+
+	log Mounting $fstype file server for $fs
+	while(! logprog mount -c /srv/$service /n/newfs)
+		sleep 2
+	if(! ~ $fsother ''){
+		log Mounting $fstype file server for $fsother
+		logprog mount -c /srv/$service /n/other other
+	}
+
+case checkready checkdone
+	if(! ~ $fstype '' && ~ $#fs 1 && test -f $fs){
+		if(test -f /srv/$service && test -d /n/newfs/dist){
+			mountfs=done
+			export mountfs
+			exit
+		}
+	}
+	mountfs=ready
+	export mountfs
+	exit
+}
