@@ -1,0 +1,18 @@
+BOOTDIR=../boot
+BOOTLIB=$BOOTDIR/libboot.a$O
+
+BOOTFILES=\
+	aux.$O\
+	boot.$O\
+
+$BOOTLIB(%.$O):N:	%.$O
+
+$BOOTLIB:	${BOOTFILES:%=$BOOTLIB(%)}
+	names=`{membername $newprereq}
+	ar vu $BOOTLIB $names
+	rm $names
+
+$BOOTFILES:	$BOOTDIR/boot.h
+
+%.$O:	$BOOTDIR/%.c
+	$CC -I$BOOTDIR $CFLAGS $BOOTDIR/$stem.c

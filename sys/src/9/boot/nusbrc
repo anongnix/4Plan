@@ -1,0 +1,42 @@
+#!/bin/rc
+
+if(! bind -a '#u' /dev)
+	exit
+mkdir -m 0700 '#σc/usb'
+if(! nusb/usbd)
+	exit
+
+@{
+	rfork ne
+	fn attach {
+		switch($4){
+		case *03
+			nusb/kb $1
+		case *08
+			nusb/disk $1
+			@{
+				rfork ne
+				cd '#σ/usb'
+				for(dev in sdU^$1.*) if(test -d $dev) {
+					diskparts $dev
+					for(part in $dev/dos* $dev/9fat) if(test -r $part) {
+						mkdir -m 0700 '#σc/'^$dev || exit
+						{dossrv -s -f $part &} <[0=1] |
+							echo 0 >'#σc/'^$dev/dos
+						exit
+					}
+				}
+			} &
+		}
+	}
+	fn detach {
+		rm -rf '#σc/usb/'^$1.* '#σc/sdU'^$1.*
+	}
+	rc < '#σ/usb/usbevent' &
+}
+
+bind -a '#σ/usb' /dev
+
+if(! ~ $#usbdelay 0)
+	sleep $usbdelay
+

@@ -1,0 +1,15 @@
+</$objtype/mkfile
+
+OFILES=\
+	usbd.$O\
+	hub.$O\
+
+HFILES=\
+	dat.h\
+	fns.h\
+
+TARG=usbd
+BIN=/$objtype/bin/nusb
+LIB=../lib/usb.a$O
+</sys/src/cmd/mkone
+CFLAGS=-I../lib $CFLAGS

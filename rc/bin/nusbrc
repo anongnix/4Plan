@@ -1,0 +1,40 @@
+#!/bin/rc
+
+if(! test -e '#σ/usb/usbevent')
+	exit
+if(! bind -a '#u' /dev)
+	exit
+
+mkdir -p -m 700 '#σc/usbnet'
+
+@{
+	rfork ne
+	fn attach {
+		switch($4){
+		case *01
+			nusb/audio $1
+		case *02
+			# serial and ethernet
+			nusb/serial $1
+			nusb/ether $1
+		case *03
+			# handled /sys/src/9/boot/nusbrc
+			# nusb/kb $1
+		case *08
+			# handled /sys/src/9/boot/nusbrc
+			# nusb/disk $1
+		case *10106
+			nusb/ptp $1
+		}
+	}
+	fn detach {
+		switch($4){
+		case *02
+			rm -f '#σ/usbnet/'^$1.*
+		}
+	}
+	rc < '#σ/usb/usbevent' &
+}
+
+bind -a '#σ/usb' /dev
+bind -a '#σ/usbnet' /net

@@ -1,0 +1,92 @@
+#!/bin/rc
+# fshalt [-r] - sync (flush) and, if possible, halt all file servers
+#	and optionally reboot
+rfork e
+reboot=no
+scram=no
+switch ($#*) {
+case 0
+case 1
+	reboot=yes
+case *
+	echo usage: $0 '[-r]' >[1=2]
+	exit usage
+}
+
+path=(/bin)
+builtin cd /
+bind -c '#s' /srv
+bind '#p' /proc
+
+unmount /mnt/consoles >[2]/dev/null
+kill consolefs | rc			# don't compete with /mnt/consoles
+sleep 1
+
+k=`{ls /srv/kfs*cmd >[2]/dev/null|sort -r}
+c=`{ls /srv/cwfs*cmd >[2]/dev/null}
+
+for (i in $k){
+	echo -n $i... 
+	switch($i){
+	case /srv/kfs.cmd
+		disk/kfscmd sync
+	case *
+		disk/kfscmd -n `{echo $i | sed -n 's%/srv/kfs.(.*).cmd%\1%p'} sync
+	}
+	sleep 2
+}
+
+# for scram, don't scram other systems
+bind -b '#P' /dev
+if (test -e '#P'/apm)
+	if (! ~ $reboot yes)
+		scram=yes
+
+# halting (binaries we run can't be on the fs we're halting)
+ramfs
+builtin cd /tmp
+cp /bin/dial/expect /tmp
+cp /bin/disk/kfscmd /tmp
+cp /bin/echo /tmp
+cp /bin/iostats /tmp
+mkdir /tmp/lib
+cp /rc/lib/rcmain /tmp/lib
+cp /bin/ns /tmp
+cp /bin/rc /tmp
+cp /bin/sed /tmp
+cp /bin/sleep /tmp
+cp /bin/scram /tmp
+bind /tmp /rc
+bind /tmp /bin
+
+# put this in a shell function so this rc script doesn't get read
+# when it's no longer accessible
+fn x {
+	echo
+	echo -n halting...
+	for (i in $k){
+		echo -n $i... 
+		switch($i){
+		case /srv/kfs.cmd
+			kfscmd halt
+		case *
+			kfscmd -n `{echo $i | sed -n 's%/srv/kfs.(.*).cmd%\1%p'} halt
+		}
+	}
+	for (i in $c){
+		echo -n $i...
+		echo halt >>$i
+		sleep 2
+	}
+	echo
+	echo done halting
+
+	if (~ $reboot yes) {
+		echo rebooting...
+		echo reboot >'#c/reboot'
+	}
+	if (~ $scram yes)
+		scram
+}
+
+x
